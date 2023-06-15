@@ -28,7 +28,7 @@ jsonデータを列にバラして保存したリレーショナルデータベ�
 
 4. DiffJson.jsonを実行
 
-以下は実行結果の例
+## 実行結果の例
 
 ```
 before update data: {'id': 1, 'key1': 'value1', 'key2': 'value2', 'key3': 3}
