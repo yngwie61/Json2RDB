@@ -5,7 +5,9 @@ save json to relational database
 ## 何ができるか
 jsonデータを列にバラして保存したリレーショナルデータベースに対し、更新内容をjson形式で与えることで差分を更新するプログラム
 
-##　事前準備
+
+## 事前準備
+
 - python実行環境
 - sqlite3の実行環境
 
