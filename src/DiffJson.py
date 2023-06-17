@@ -3,21 +3,39 @@ import numpy as np
 import json
 import timeit
 
-def selectDB(id, cursor):
+
+def getTableInfo(table_name, cursor):
+    query = f"PRAGMA table_info({table_name})"
+    cursor.execute(query)
+    table_info = cursor.fetchall()
+    schema_array = []
+    for row in table_info:
+        schema_array.append(row)
+    return schema_array
+
+
+def getJsonFronRDB(id, cursor):
     # JSONデータをデータベースに挿入
-    select_query = f"SELECT * FROM dummy WHERE id = ? LIMIT 1"
+    assumed_key_array = getTableInfo("dummy", cursor)
+    select_query = f"SELECT * FROM dummy WHERE id = ?"
     cursor.execute(select_query, (id,))
-    result = cursor.fetchall()[0]
-    result_json = {
-        "id": id,
-        "key1": result[1],
-        "key2": result[2],
-        "key3": result[3]
-    }
-    return result_json
+    results = cursor.fetchall()
+    result_json = {}
+    if len(results) == 0:
+        # 結果がない
+        return result_json
+
+    elif len(results) > 1:
+        raise Exception("Unique Key Error")
+
+    else:
+        for result, key in zip(results[0], assumed_key_array):
+            result_json[key[1]] = result
+
+        return result_json
 
 
-def updateDB(diff_json, cursor):
+def updateDBFromJson(diff_json, cursor):
     key_query_array = []
     value_array = []
     id = diff_json["id"]
@@ -37,6 +55,7 @@ def updateDB(diff_json, cursor):
 
         return True
 
+
 def validateJson(current_json_data, new_json_data):
     list1 = list(current_json_data.keys())
     list2 = list(new_json_data.keys())
@@ -44,47 +63,45 @@ def validateJson(current_json_data, new_json_data):
     if len(key_diff) == 0:
         return True
     else:
-        ### もしkey diffがあったら処理は中断すべき
+        ### もしkey diffがあったら処理は中断
         return False
+
 
 def getDiffFronJson(current_json_data, new_json_data):
     if (current_json_data["id"] == new_json_data["id"]):
         if validateJson(current_json_data, new_json_data):
             id = current_json_data["id"]
-            diff_json = {}
-            update_json = {"id": id}
+            diff_json = {"id": id}
             for key in list(current_json_data.keys()):
                 if current_json_data[key] != new_json_data[key]:
-                    diff_json[key] = {"old": current_json_data[key], "new": new_json_data[key]}
-                    update_json[key] = new_json_data[key]
+                    # diff_json[key] = {"old": current_json_data[key], "new": new_json_data[key]}
+                    diff_json[key] = new_json_data[key]
             # 差分をSQLでUPDATEしたら良い
-            return update_json, diff_json
+            return diff_json
         else:
             raise Exception("Json Schema Error")
 
 
-def main():
+def main(id_key, json_path):
     # SQLiteデータベースに接続
     connection = sqlite3.connect('db/test.db')
     cursor = connection.cursor()
 
     # DBからの読み込み
-    target_key = 1
-    current_json_data = selectDB(target_key, cursor)
-    print(f"before update data: {current_json_data}")
-    with open('update.json') as file:
-        new_json_data = json.load(file)
-        print(f"new json data: {new_json_data}")
-        update_json, diff_json = getDiffFronJson(current_json_data, new_json_data)
-        updateDB(update_json, cursor)
-
-    print(f"diff data: {update_json}")
-    print(f"after update data: {selectDB(target_key, cursor)}")
+    with open(json_path) as f:
+        new_json_data = json.load(f)
+        current_json_data = getJsonFronRDB(new_json_data[id_key], cursor)
+        diff_json = getDiffFronJson(current_json_data, new_json_data)
+        print(diff_json)
+        updateDBFromJson(diff_json, cursor)
 
     # コミットと接続のクローズ
     connection.commit()
     connection.close()
 
+
 # 実行時間を計測
-execution_time = timeit.timeit(main, number=1) * 1000 # msec変換
+id_key = "id"
+json_path = 'update.json'
+execution_time = timeit.timeit(lambda: main(id_key, json_path), number=1) * 1000 # msec変換
 print(f"処理時間: {execution_time} ミリ秒")
