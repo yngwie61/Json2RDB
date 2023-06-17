@@ -100,8 +100,9 @@ def main(id_key, json_path):
     connection.close()
 
 
-# 実行時間を計測
-id_key = "id"
-json_path = 'update.json'
-execution_time = timeit.timeit(lambda: main(id_key, json_path), number=1) * 1000 # msec変換
-print(f"処理時間: {execution_time} ミリ秒")
+if __name__ == '__main__':
+    # 実行時間を計測
+    id_key = "id"
+    json_path = 'update.json'
+    execution_time = timeit.timeit(lambda: main(id_key, json_path), number=1) * 1000 # msec変換
+    print(f"処理時間: {execution_time} ミリ秒")
