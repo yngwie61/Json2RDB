@@ -11,7 +11,7 @@ from Json2RDB import getJsonFronRDB, getDiffFronJson, updateDBFromJson
 
 
 app = Flask(__name__)
-redis_client = redis.Redis(host='localhost', port=6379)  # Redisクライアントを作成
+redis_client = redis.Redis(host='redis', port=6379)  # Redisクライアントを作成
 
 
 def clear_redis_cache():
@@ -49,7 +49,7 @@ def update_example_api():
         "id": 1,
         "key1": content,
         "key2": "value2",
-        "key3": 30
+        "key3": 300
     }
 
     # SQLiteデータベースに接続
@@ -77,7 +77,8 @@ def example():
     uri = urlparse(request.url).path
     etag = request.headers.get('If-None-Match')
     id = request.args.get('id')
-    current_etag = get_etag(uri)
+    key_uri = f"{uri}?id={id}"
+    current_etag = get_etag(key_uri)
     if current_etag is not None:
         current_etag = current_etag.decode('utf-8')
 
@@ -89,6 +90,7 @@ def example():
         response.headers['ETag'] = current_etag
 
     else:
+        print("------------------DBアクセスが発生します------------------")
         # SQLiteデータベースに接続
         connection = sqlite3.connect('db/test.db')
         cursor = connection.cursor()
@@ -97,7 +99,7 @@ def example():
         # SHA-256ハッシュを計算しetagとして設定
         new_etag = calculate_sha256_hash(response_string)
         # RedisにETagを保存
-        redis_client.set(uri, new_etag)
+        redis_client.set(key_uri, new_etag)
         # レスポンス生成
         response = make_response(response_string, 200)
         response.headers['Contesnt-Type'] = 'application/json'
@@ -112,4 +114,4 @@ def example():
 if __name__ == '__main__':
     # 初回のDB更新をスケジュール
     update_example_api()
-    app.run()
+    app.run(host='0.0.0.0', port=5000)

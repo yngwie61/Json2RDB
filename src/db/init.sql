@@ -7,13 +7,11 @@ CREATE TABLE dummy (
     key3 INTEGER
 );
 
+WITH RECURSIVE cnt(x) AS (
+  SELECT 1
+  UNION ALL
+  SELECT x + 1 FROM cnt WHERE x < 10000
+)
 INSERT INTO dummy (key1, key2, key3)
-SELECT
-  'Value' || CAST(ROW_NUMBER() OVER () AS TEXT),
-  'value' || CAST(ABS(RANDOM()) % 100 AS TEXT) AS key2,
-  CAST(RANDOM() % 10 + 1 AS INTEGER) AS key3
-FROM
-  (SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5) dummy
-LIMIT 20;
-
-
+SELECT 'value' || x, 'value' || (x + 1), x + 122
+FROM cnt;
