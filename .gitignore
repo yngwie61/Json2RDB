@@ -1,3 +1,5 @@
 src/db/test.db
 src/__pycache__
 dump.rdb
+.env
+docker/mysql-data/

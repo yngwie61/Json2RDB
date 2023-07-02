@@ -7,12 +7,25 @@ import json
 import hashlib
 from urllib.parse import urlparse
 import sqlite3
-from Json2RDB import getJsonFronRDB, getDiffFronJson, updateDBFromJson
+from Json2RDB import Json2RDB
+import os
 
 
 app = Flask(__name__)
 redis_client = redis.Redis(host='redis', port=6379)  # Redisクライアントを作成
-
+j2db = Json2RDB(
+    unique_key = "id",
+    db_table_name = os.environ.get("MYSQL_DATABASE_TABLE_NAME"),
+    db = os.environ.get("MYSQL_DATABASE"),
+    host="mysql",
+    password=os.environ.get("MYSQL_PASSWORD"),
+    port=3306,
+    user=os.environ.get("MYSQL_USER"),
+    charset="utf8mb4",
+    connect_timeout=60,
+    read_timeout=60,
+    write_timeout=30,
+)
 
 def clear_redis_cache():
     # キャッシュ一覧のキーを取得
@@ -43,7 +56,7 @@ def generate_random_string(length):
 
 # APIの定期的な更新処理
 def update_example_api():
-    content = generate_random_string(500000)
+    content = generate_random_string(5)
     # データ生成. 実際には　SQLなどを実行する.
     new_json_data = {
         "id": 1,
@@ -53,15 +66,12 @@ def update_example_api():
     }
 
     # SQLiteデータベースに接続
-    connection = sqlite3.connect('db/test.db')
-    cursor = connection.cursor()
-    current_json_data = getJsonFronRDB(1, cursor)
-    diff_json = getDiffFronJson(current_json_data, new_json_data)
-    updateDBFromJson(diff_json, cursor)
+    current_json_data = j2db.get_json_from_rdb(1)
+    diff_json = j2db.get_diff_from_json(current_json_data, new_json_data)
+    print(diff_json)
+    j2db.update_db_from_json(diff_json)
     # キャッシュの削除, コミットと接続のクローズ
     clear_redis_cache()
-    connection.commit()
-    connection.close()
     print("------------------UPDATE DB------------------")
     # 次の更新をスケジュール
     threading.Timer(15, update_example_api).start()  # 10秒後に更新
@@ -92,9 +102,7 @@ def example():
     else:
         print("------------------DBアクセスが発生します------------------")
         # SQLiteデータベースに接続
-        connection = sqlite3.connect('db/test.db')
-        cursor = connection.cursor()
-        response_json = getJsonFronRDB(id, cursor)
+        response_json = j2db.get_json_from_rdb(id)
         response_string = json.dumps(response_json, indent=4)
         # SHA-256ハッシュを計算しetagとして設定
         new_etag = calculate_sha256_hash(response_string)
@@ -104,9 +112,6 @@ def example():
         response = make_response(response_string, 200)
         response.headers['Contesnt-Type'] = 'application/json'
         response.headers['ETag'] = new_etag
-        # コミットと接続のクローズ
-        connection.commit()
-        connection.close()
 
     return response
 
